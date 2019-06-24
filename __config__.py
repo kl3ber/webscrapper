@@ -1,11 +1,14 @@
 
-empresa = [
-    'Extra.com.br',
-    'Barateiro.com',
-    'Bartira Móveis',
-]
+chrome_version = '75.0.3770.100'
+# chrome_version = '73.0.3683.68'
 
-filter_name = 'Simulador SQUAD GPA'
+empresas = {
+    'EXTRA': 'Extra.com.br',
+    'BARATEIRO': 'Barateiro.com',
+    'BARTIRA': 'Bartira Móveis',
+}
+
+filter_name = 'SQUAD VVJ'
 
 parametros_xpath = {
     'Empresa': '/html/body/div[3]/div/div/div/div[1]/div/div[1]/div[1]/div[1]/select',
