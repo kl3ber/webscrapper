@@ -4,7 +4,6 @@ from hugme.__config__ import xpath, empresas, filter_name, chrome_version
 from selenium import webdriver
 from webdriver_manager.chrome import ChromeDriverManager
 from bs4 import BeautifulSoup
-from datetime import datetime
 from time import sleep
 
 
@@ -13,10 +12,10 @@ class HugMe(object):
         self.filter_name = filter_name
         self.empresas = empresas
         self.new_reports = []
+        self.downloaded_files = []
 
         self.driver = None
         self.hide = hide
-        self.access_website()
 
     def access_website(self):
         from selenium.webdriver.chrome.options import Options
@@ -29,23 +28,31 @@ class HugMe(object):
         driver.get('https://app.hugme.com.br/')
         self.driver = driver
 
-    def login(self):
-        from __key__ import uid, pwd
+    def login(self, retries=15):
+        from hugme.__key__ import uid, pwd
+        from datetime import datetime
         self.driver.find_element_by_id('user').send_keys(uid)
         self.driver.find_element_by_id('password').send_keys(pwd)
-        self.driver.find_element_by_xpath('//*[@id="submit-button"]').click()
-        return self.driver.find_element_by_xpath('//*[@id="error-message"]').text
-        #sleep(3)
+        sleep(2)
+        print('')
 
-        #if self.driver.current_url == 'https://app.hugme.com.br/app.html#/':
-        #    return 'Login realizado.'
-        #else:
-        #    return self.driver.find_element_by_xpath('//*[@id="error-message"]').text
+        for i in range(retries):
+            self.driver.find_element_by_xpath('//*[@id="submit-button"]').click()
+            sleep(5)
+
+            if self.driver.current_url == 'https://app.hugme.com.br/app.html#/':
+                return print('Login realizado.')
+            else:
+                print(
+                    datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    self.driver.find_element_by_xpath('//*[@id="error-message"]').text
+                )
+                sleep(10)
+        return print('Não foi possível logar no sistema.')
 
     def access_reports_page(self):
         self.driver.get('https://app.hugme.com.br/app.html#/dados/tickets/exportar/')
-        while 'Novo relatório' not in self.driver.page_source:
-            pass
+        while 'Novo relatório' not in self.driver.page_source: pass
 
     def find_filter_index(self, filter_name):
         """ Encontra o indice do filtro desejado entre todos os filtros pré-criados """
@@ -78,6 +85,7 @@ class HugMe(object):
 
     def submit_report(self, report_name):
         """ Escreve o nome/titulo do relatório e subemete/clica em 'Gerar Relatório' """
+        from datetime import datetime
         self.driver.find_element_by_xpath(xpath['Titulo']).clear()
         self.driver.find_element_by_xpath(xpath['Titulo']).send_keys(report_name)
         sleep(1)
@@ -133,19 +141,28 @@ class HugMe(object):
     def delete_report(self, index):
         """ Exclusão do relatório """
         self.driver.find_element_by_xpath(xpath['Excluir'].format(index)).click()
-        sleep(4)
+        sleep(5)
+
+    def check_destination_folder(self):
+        from os import getcwd
+        name = self.__class__.__name__.lower()
+        return getcwd() + '\\data\\' if getcwd().split('\\')[-1] == name else getcwd() + '\\' + name + '\\data\\'
 
     def move_downloaded_file(self, report_name):
-        from os import listdir, path
+        """ Mover um arquivo """
+        from os import listdir, path, getcwd
         from shutil import move
 
         for file in listdir(path.expanduser('~\\Downloads\\')):
             if report_name.replace('_', '').lower() in file:
-                move(path.expanduser('~/Downloads/') + file, 'data/' + file)
+                move(path.expanduser('~\\Downloads\\') + file, getcwd() + '\\data\\' + file)
 
     def move_all_downloaded_files(self):
+        """ mover todos os arquivos baixados de uma vez """
         from os import listdir, path
         from shutil import move
+
+        destination = self.check_destination_folder()
 
         result = [
             file
@@ -153,50 +170,46 @@ class HugMe(object):
             for report in self.new_reports
             if report.replace('_', '').lower()in file
         ]
-        return [move(path.expanduser('~/Downloads/') + file, 'data/' + file) for file in result]
+        return [move(path.expanduser('~\\Downloads\\') + file, destination + file) for file in result]
 
 
 if __name__ == '__main__':
-    from time import time, sleep
-    from datetime import datetime
-    from hugme import HugMe
+    from pandas import set_option, read_excel, DataFrame
+    from os import getcwd, listdir
 
-    temp_ini = datetime.now().replace(microsecond=0)
-    rpa = HugMe()
-    rpa.login()
+    set_option('display.max_rows', 15)
+    set_option('display.max_columns', 300)
+    set_option('display.width', 3000)
 
-    rpa.access_reports_page()
-    rpa.select_preset_filter()
+    path = getcwd() + '\\hugme\\data\\'
+    files = listdir(path)
 
-    for empresa, selection_name in rpa.empresas.items():
-        rpa.select_empresa(empresa=selection_name)
-        titulo = empresa.replace(' ', '_') + '_' + str(time()).replace('.', '')
-        rpa.submit_report(report_name=titulo)
-        rpa.new_reports.append(titulo)
+    downloaded_files = {
+        '1012_bartira15617461772969072_1561746345009.xlsx':                 'Bartira',
+        '1013_casasbahialojafisica15617461851143312_1561746375009.xlsx':    'Casas Bahia Loja Física',
+        '1014_pontofriolojafisica1561746193466698_1561746405009.xlsx':      'Ponto Frio Loja Física',
+        '137_extra15617461191844656_1561746135025.xlsx':                    'Extra',
+        '138_pontofriolojavirtual1561746127091306_1561746165011.xlsx':      'Ponto Frio Loja Virutal',
+        '139_casasbahialojavirtual1561746136120041_1561746195010.xlsx':     'Casas Bahia Loja Virtual',
+        '159_barateiro15617461449438148_1561746225011.xlsx':                'Barateiro',
+        '159_casasbahiamarketplace15617461523521512_1561746255010.xlsx':    'Casas Bahia Marketplace',
+        '159_pontofriomarketplace15617461606023254_1561746285015.xlsx':     'Ponto Frio Markeplace',
+        '492_extramarketplace15617461691500351_1561746315010.xlsx':         'Extra Marketplace',
+    }
 
-    to_be_downloaded = rpa.new_reports.copy()
-    print('\nVerificando disponibilidade de download...\n')
+    base_reclamacoes = DataFrame()
+    for file, empresa in downloaded_files.items():
+        df = read_excel(path + file, header=3)
+        df['Empresa'] = empresa
+        base_reclamacoes = base_reclamacoes.append(df)
 
-    while not to_be_downloaded == []:
-        rpa.driver.refresh()
-        # while 'Carregar mais' not in rpa.driver.page_source: pass
-        sleep(30)
+    cols = base_reclamacoes.columns.tolist()
+    cols = cols[-1:] + cols[:-1]
+    base_reclamacoes = base_reclamacoes[cols]
 
-        for report in to_be_downloaded:
-            index, download = rpa.find_report(report_name=report)
-            if download:
-                rpa.download_report(index)
-                while not rpa.check_file_download(report): pass
-                sleep(3)
+    for col in base_reclamacoes.columns:
+        if 'Unnamed' in col:
+            base_reclamacoes.drop(columns=col, inplace=True)
 
-                rpa.delete_report(index)
-                rpa.move_downloaded_file(report)
-                to_be_downloaded.remove(report)
-                print(datetime.now().strftime("%Y-%m-%d %H:%M:%S"), 'Download: ', report)
+    base_reclamacoes.to_csv(path + 'base_reclamacoes.csv')
 
-    rpa.driver.refresh()
-
-    print('\nExtração concluída.\n')
-    print('Tempo de execução: ', datetime.now().replace(microsecond=0) - temp_ini)
-    rpa.driver.close()
-    rpa.driver.quit()

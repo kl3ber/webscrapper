@@ -1,18 +1,20 @@
 
 chrome_version = '75.0.3770.100'
 
-empresas = {
-    'EXTRA': 'Extra.com.br',
-    'PONTO FRIO': 'Ponto Frio -Loja Virtual',
-    'CASAS BAHIA': 'Casas Bahia (Loja Virtual)',
-    'BARATEIRO': 'Barateiro.com',
-    'CASAS BAHIA MARKETPLACE': 'Casas Bahia - Marketplace',
-    'BARTIRA': 'Bartira Móveis',
-}
-
 filter_name = 'SQUAD VVJ'
 
-hide = False
+empresas = {
+    'EXTRA':                    'Extra.com.br',
+    'PONTO FRIO LOJA VIRTUAL':  'Ponto Frio -Loja Virtual',
+    'CASAS BAHIA LOJA VIRTUAL': 'Casas Bahia (Loja Virtual)',
+    'BARATEIRO':                'Barateiro.com',
+    'CASAS BAHIA MARKETPLACE':  'Casas Bahia - Marketplace',
+    'PONTO FRIO MARKETPLACE':   'Ponto Frio - Marketplace',
+    'EXTRA MARKETPLACE':        'Extra.com.br - Marketplace',
+    'BARTIRA':                  'Bartira Móveis',
+    'CASAS BAHIA LOJA FISICA':  'Casas Bahia - Lojas Físicas',
+    'PONTO FRIO LOJA FISICA':   'Ponto Frio - Lojas Físicas',
+}
 
 xpath = {
     'Empresa':              '/html/body/div[3]/div/div/div/div[1]/div/div[1]/div[1]/div[1]/select',
