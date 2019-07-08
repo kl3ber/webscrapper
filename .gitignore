@@ -4,3 +4,7 @@ venv/
 __pycache__/
 
 hugme/site_example/HugMe_files/
+
+*.csv
+
+*.pkl

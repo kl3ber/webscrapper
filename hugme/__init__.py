@@ -9,13 +9,17 @@ from time import sleep
 
 class HugMe(object):
     def __init__(self, hide=False):
+        self.logged = False
         self.filter_name = filter_name
         self.empresas = empresas
-        self.new_reports = []
-        self.downloaded_files = []
+        self.destination_folder = self.check_destination_folder()
+        self.new_reports = {}
+        self.downloaded_files = {}
+        self.final_file = None
 
         self.driver = None
         self.hide = hide
+        self.access_website()
 
     def access_website(self):
         from selenium.webdriver.chrome.options import Options
@@ -41,6 +45,7 @@ class HugMe(object):
             sleep(5)
 
             if self.driver.current_url == 'https://app.hugme.com.br/app.html#/':
+                self.logged = True
                 return print('Login realizado.')
             else:
                 print(
@@ -65,6 +70,7 @@ class HugMe(object):
         return False
 
     def select_preset_filter(self):
+        """ Encontra e seleciona o filtro pré-criado na listas de filtros salvos """
         self.driver.find_element_by_xpath('/html/body/div[3]/div/div/div/div[1]/div/div[1]/header/h1').click()
         self.driver.find_element_by_xpath(xpath['Filtros Salvos']).click()
         sleep(2)
@@ -143,73 +149,92 @@ class HugMe(object):
         self.driver.find_element_by_xpath(xpath['Excluir'].format(index)).click()
         sleep(5)
 
+    def delete_all_reports(self):
+        """ Deleta todos os  """
+        self.scrolldown_load_older_reports(times=5)
+        for file in self.new_reports.keys():
+            index, download = self.find_report(report_name=file)
+            self.delete_report(index)
+
     def check_destination_folder(self):
+        """ Verifica qual o path completo da pasta hugme/data """
         from os import getcwd
         name = self.__class__.__name__.lower()
         return getcwd() + '\\data\\' if getcwd().split('\\')[-1] == name else getcwd() + '\\' + name + '\\data\\'
 
+    def get_downloaded_files_names(self):
+        from os import listdir, path
+
+        result = {
+            empresa: file
+            for empresa, report in self.new_reports.items()
+            for file in listdir(path.expanduser('~\\Downloads\\'))
+            if report.replace('_', '').lower() in file
+        }
+
+        return result
+
     def move_downloaded_file(self, report_name):
-        """ Mover um arquivo """
-        from os import listdir, path, getcwd
+        """ Mover apenas arquivo para a pasta data do projeto """
+        from os import path
         from shutil import move
 
-        for file in listdir(path.expanduser('~\\Downloads\\')):
-            if report_name.replace('_', '').lower() in file:
-                move(path.expanduser('~\\Downloads\\') + file, getcwd() + '\\data\\' + file)
+        origin = path.expanduser('~\\Downloads\\') + report_name + '.csv'
+        destination = self.destination_folder + report_name + '.csv'
+        try:
+            move(origin, destination)
+        except FileNotFoundError:
+            pass
 
     def move_all_downloaded_files(self):
-        """ mover todos os arquivos baixados de uma vez """
-        from os import listdir, path
+        """ Mover todos os arquivos baixados de uma só vez para a pasta data do projeto """
+        from os import path
         from shutil import move
 
-        destination = self.check_destination_folder()
+        for file in self.downloaded_files.values():
+            move(path.expanduser('~\\Downloads\\') + file, self.destination_folder + file)
 
-        result = [
-            file
-            for file in listdir(path.expanduser('~\\Downloads\\'))
-            for report in self.new_reports
-            if report.replace('_', '').lower()in file
-        ]
-        return [move(path.expanduser('~\\Downloads\\') + file, destination + file) for file in result]
+    def concatenate_files(self):
+        """ Consolida a base de reclamações de todas as empresas em apenas um arquivo """
+        from pandas import read_excel, DataFrame
+        from datetime import datetime
+
+        base_reclamacoes = DataFrame()
+        for empresa, file in self.downloaded_files.items():
+            df = read_excel(self.destination_folder + file, header=3)
+            df['Empresa'] = empresa
+            base_reclamacoes = base_reclamacoes.append(df)
+
+        for col in base_reclamacoes.columns:
+            if 'Unnamed' in col:
+                base_reclamacoes.drop(columns=col, inplace=True)
+
+        self.final_file = self.destination_folder + datetime.now().strftime('%Y%m%d%H%M%S') + '_base_reclamacoes.csv'
+        base_reclamacoes.to_csv(self.final_file, index=False)
+
+    def delete_all_downloaded_files(self):
+        """ Deleta os arquivos baixados """
+        from os import remove
+
+        for file in list(self.downloaded_files.values()):
+            remove(self.destination_folder + file)
+
+    def move_to_storage_account(self):
+        from azure.storage.file import FileService
+        from hugme.__key__ import acc, key
+
+        file_service = FileService(account_name=acc, account_key=key)
+
+        # file_service.create_share('complains')
+        # file_service.create_directory('complains', 'final')
+
+        file_service.create_file_from_path(
+            share_name='complains',
+            directory_name='final',
+            file_name='hugme.csv',
+            local_file_path=self.final_file,
+        )
 
 
 if __name__ == '__main__':
-    from pandas import set_option, read_excel, DataFrame
-    from os import getcwd, listdir
-
-    set_option('display.max_rows', 15)
-    set_option('display.max_columns', 300)
-    set_option('display.width', 3000)
-
-    path = getcwd() + '\\hugme\\data\\'
-    files = listdir(path)
-
-    downloaded_files = {
-        '1012_bartira15617461772969072_1561746345009.xlsx':                 'Bartira',
-        '1013_casasbahialojafisica15617461851143312_1561746375009.xlsx':    'Casas Bahia Loja Física',
-        '1014_pontofriolojafisica1561746193466698_1561746405009.xlsx':      'Ponto Frio Loja Física',
-        '137_extra15617461191844656_1561746135025.xlsx':                    'Extra',
-        '138_pontofriolojavirtual1561746127091306_1561746165011.xlsx':      'Ponto Frio Loja Virutal',
-        '139_casasbahialojavirtual1561746136120041_1561746195010.xlsx':     'Casas Bahia Loja Virtual',
-        '159_barateiro15617461449438148_1561746225011.xlsx':                'Barateiro',
-        '159_casasbahiamarketplace15617461523521512_1561746255010.xlsx':    'Casas Bahia Marketplace',
-        '159_pontofriomarketplace15617461606023254_1561746285015.xlsx':     'Ponto Frio Markeplace',
-        '492_extramarketplace15617461691500351_1561746315010.xlsx':         'Extra Marketplace',
-    }
-
-    base_reclamacoes = DataFrame()
-    for file, empresa in downloaded_files.items():
-        df = read_excel(path + file, header=3)
-        df['Empresa'] = empresa
-        base_reclamacoes = base_reclamacoes.append(df)
-
-    cols = base_reclamacoes.columns.tolist()
-    cols = cols[-1:] + cols[:-1]
-    base_reclamacoes = base_reclamacoes[cols]
-
-    for col in base_reclamacoes.columns:
-        if 'Unnamed' in col:
-            base_reclamacoes.drop(columns=col, inplace=True)
-
-    base_reclamacoes.to_csv(path + 'base_reclamacoes.csv')
-
+    pass
