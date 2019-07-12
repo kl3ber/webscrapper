@@ -1,6 +1,6 @@
 
 
-from hugme.__config__ import xpath, empresas, filter_name, hide, chrome_version
+from hugme.config import xpath, empresas, filter_name, hide, chrome_version
 
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
