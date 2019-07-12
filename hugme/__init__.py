@@ -1,5 +1,5 @@
 
-from hugme.__config__ import xpath, empresas, filter_name, chrome_version
+from hugme.config import xpath, empresas, filter_name, chrome_version
 
 from selenium import webdriver
 from webdriver_manager.chrome import ChromeDriverManager
@@ -8,7 +8,7 @@ from time import sleep
 
 
 class HugMe(object):
-    def __init__(self, hide=False):
+    def __init__(self, hide=False, open_browser=True):
         self.logged = False
         self.filter_name = filter_name
         self.empresas = empresas
@@ -19,22 +19,38 @@ class HugMe(object):
 
         self.driver = None
         self.hide = hide
-        self.access_website()
+
+        if open_browser:
+            self.access_website()
 
     def access_website(self):
         from selenium.webdriver.chrome.options import Options
 
         options = Options()
         options.headless = self.hide
+        options.add_argument("--mute-audio")
+        # options.add_argument("--incognito")
+        # options.add_argument("download.default_directory=" + self.destination_folder)
+        # options.add_argument("download.default_directory=C:/Users/est_ab1283160/Documents/projects/gpa_webscrapper/hugme/data")
+        options.add_experimental_option('prefs', {'download.default_directory': self.destination_folder})
 
         driver = webdriver.Chrome(ChromeDriverManager().install(), options=options)
         driver.maximize_window()
+        driver.implicitly_wait(300)
         driver.get('https://app.hugme.com.br/')
+
+        # try:
+        #    driver.set_page_load_timeout(10)
+        #    driver.get('https://app.hugme.com.br/')
+        # except Exception:
+        #    # driver.execute_script("window.stop();")
+
         self.driver = driver
 
     def login(self, retries=15):
         from hugme.__key__ import uid, pwd
         from datetime import datetime
+
         self.driver.find_element_by_id('user').send_keys(uid)
         self.driver.find_element_by_id('password').send_keys(pwd)
         sleep(2)
@@ -48,11 +64,10 @@ class HugMe(object):
                 self.logged = True
                 return print('Login realizado.')
             else:
-                print(
-                    datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                    self.driver.find_element_by_xpath('//*[@id="error-message"]').text
-                )
+                error = self.driver.find_element_by_xpath('//*[@id="error-message"]').text
+                print(datetime.now().strftime("%Y-%m-%d %H:%M:%S"), error)
                 sleep(10)
+
         return print('Não foi possível logar no sistema.')
 
     def access_reports_page(self):
@@ -84,7 +99,7 @@ class HugMe(object):
             print('Filtro não encontrado. Por favor, verifique o nome.\n')
 
     def select_empresa(self, empresa):
-        """ Encontra a empresa na lista de seleção - combobox"""
+        """ Encontra e seleciona a empresa na lista de seleção - combobox"""
         for option in self.driver.find_element_by_xpath(xpath['Empresa']).find_elements_by_tag_name('option'):
             if option.get_attribute('label') == empresa:
                 option.click()
@@ -93,17 +108,28 @@ class HugMe(object):
         """ Escreve o nome/titulo do relatório e subemete/clica em 'Gerar Relatório' """
         from datetime import datetime
         self.driver.find_element_by_xpath(xpath['Titulo']).clear()
+        sleep(3)
         self.driver.find_element_by_xpath(xpath['Titulo']).send_keys(report_name)
-        sleep(1)
+        sleep(3)
         self.driver.find_element_by_xpath(xpath['Gerar Relatório']).click()
         print(datetime.now().strftime("%Y-%m-%d %H:%M:%S"), 'Relatório Gerado: ', report_name)
         sleep(5)
 
     def scrolldown_load_older_reports(self, times=1):
         """ Scroll down na lista de relatórios disponíveis, carregar mais relatórios """
+        while 'Carregar mais' not in self.driver.page_source: pass
+        sleep(3)
         for i in range(times):
             element = self.driver.find_element_by_xpath(xpath['Carregar Mais'])
             self.driver.execute_script("arguments[0].scrollIntoView();", element)
+            self.driver.find_element_by_xpath(xpath['Carregar Mais']).click()
+            sleep(3)
+
+    def load_more_reports(self, times=1):
+        for i in range(times):
+            html = self.driver.find_element_by_xpath(xpath['Lista de Relatórios']).get_attribute('innerHTML')
+            while 'Carregar mais' not in html: pass
+            sleep(2)
             self.driver.find_element_by_xpath(xpath['Carregar Mais']).click()
             sleep(3)
 
@@ -139,18 +165,19 @@ class HugMe(object):
 
     def check_file_download(self, report_name):
         from os import listdir, path
-        for file in listdir(path.expanduser('~/Downloads/')):
+        # path.expanduser('~/Downloads/')
+        for file in listdir(self.destination_folder):
             if report_name.replace('_', '').lower() in file:
                 return True
         return False
 
     def delete_report(self, index):
-        """ Exclusão do relatório """
+        """ Exclusão de relatório por index """
         self.driver.find_element_by_xpath(xpath['Excluir'].format(index)).click()
         sleep(5)
 
     def delete_all_reports(self):
-        """ Deleta todos os  """
+        """ Deleta todos os novos relatórios gerados """
         self.scrolldown_load_older_reports(times=5)
         for file in self.new_reports.keys():
             index, download = self.find_report(report_name=file)
@@ -164,15 +191,16 @@ class HugMe(object):
 
     def get_downloaded_files_names(self):
         from os import listdir, path
-
+        # path.expanduser('~\\Downloads\\
         result = {
             empresa: file
             for empresa, report in self.new_reports.items()
-            for file in listdir(path.expanduser('~\\Downloads\\'))
+            for file in listdir(self.destination_folder)
             if report.replace('_', '').lower() in file
         }
 
-        return result
+        self.downloaded_files = result
+        # return result
 
     def move_downloaded_file(self, report_name):
         """ Mover apenas arquivo para a pasta data do projeto """
@@ -219,21 +247,32 @@ class HugMe(object):
         for file in list(self.downloaded_files.values()):
             remove(self.destination_folder + file)
 
-    def move_to_storage_account(self):
-        from azure.storage.file import FileService
+    def move_to_storage_account(self, object='blob'):
         from hugme.__key__ import acc, key
 
-        file_service = FileService(account_name=acc, account_key=key)
+        if object == 'blob':
+            from azure.storage.blob import BlockBlobService, PublicAccess
 
-        # file_service.create_share('complains')
-        # file_service.create_directory('complains', 'final')
+            block_blob_service = BlockBlobService(account_name=acc, account_key=key)
+            block_blob_service.set_container_acl('final', public_access=PublicAccess.Container)
+            block_blob_service.create_blob_from_path(
+                container_name='final',
+                blob_name='hugme',
+                file_path=self.final_file,
+            )
 
-        file_service.create_file_from_path(
-            share_name='complains',
-            directory_name='final',
-            file_name='hugme.csv',
-            local_file_path=self.final_file,
-        )
+        elif object == 'files':
+            from azure.storage.file import FileService
+
+            file_service = FileService(account_name=acc, account_key=key)
+            # file_service.create_share('complains')
+            # file_service.create_directory('complains', 'final')
+            file_service.create_file_from_path(
+                share_name='complains',
+                directory_name='final',
+                file_name='hugme.csv',
+                local_file_path=self.final_file,
+            )
 
 
 if __name__ == '__main__':

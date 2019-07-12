@@ -5,5 +5,5 @@ pwd = 'Atento2019'
 
 # account storage
 acc = 'gparpa'
-key = '96sDr93p5L8JzZernT7SdtbDSdnKedML+leCwrv9n/2gMOskQbZVEch36GKHd7W/xS4FxHdMqDoTEW/yvKHT1A=='
+key = 'GLuoryujV2pZ2QWbX5lZ/e1xS6Lt+R69ZbNrM7QG2ppwVyWui/HAcQd1H70z+8H0VDBY0ve726gURYvRK4VRIQ=='
 

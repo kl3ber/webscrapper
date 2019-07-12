@@ -1,6 +1,4 @@
 
-import schedule
-
 
 def extract_reports_from_portal():
     from time import time, sleep
@@ -31,9 +29,8 @@ def extract_reports_from_portal():
     # Verificar se o relatório foi gerado e fazer o download
     while not to_be_downloaded == []:
         rpa.driver.refresh()
-        while 'Carregar mais' not in rpa.driver.page_source: pass
-        sleep(3)
-        rpa.scrolldown_load_older_reports(times=5)
+        rpa.scrolldown_load_older_reports(times=2)
+        # rpa.load_more_reports(times=5)
         sleep(10)
 
         for report in to_be_downloaded:
@@ -44,7 +41,7 @@ def extract_reports_from_portal():
                 sleep(5)
 
                 rpa.delete_report(index)
-                rpa.move_downloaded_file(report)
+                # rpa.move_downloaded_file(report)
                 to_be_downloaded.remove(report)
                 print(datetime.now().strftime("%Y-%m-%d %H:%M:%S"), 'Download: ', report)
         sleep(20)
@@ -54,8 +51,8 @@ def extract_reports_from_portal():
     sleep(3)
 
     # Concatenar os arquivos baixados e gerar a base consolidada
-    rpa.downloaded_files = rpa.get_downloaded_files_names()
-    rpa.move_all_downloaded_files()
+    rpa.get_downloaded_files_names()
+    # rpa.move_all_downloaded_files()
     rpa.concatenate_files()
     rpa.delete_all_downloaded_files()
     rpa.move_to_storage_account()
@@ -66,12 +63,11 @@ def extract_reports_from_portal():
 
 
 def schedule_run():
-    # schedule.every().day.at("17:80").do(extract_reports_from_portal)
-    # schedule.every(2).hours.do(extract_reports_from_portal)
+    import schedule
 
     schedule.every().day.at("08:00").do(extract_reports_from_portal)
-    schedule.every().day.at("11:00").do(extract_reports_from_portal)
-    schedule.every().day.at("16:00").do(extract_reports_from_portal)
+    schedule.every().day.at("14:00").do(extract_reports_from_portal)
+    schedule.every().day.at("18:00").do(extract_reports_from_portal)
 
     while True:
         schedule.run_pending()
@@ -83,8 +79,4 @@ if __name__ == '__main__':
     from time import sleep
 
     schedule_run()
-
-
-
-
 
