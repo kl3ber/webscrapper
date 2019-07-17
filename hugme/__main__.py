@@ -7,7 +7,10 @@ def extract_reports_from_portal():
 
     temp_ini = datetime.now().replace(microsecond=0)
 
+    """ Login e navegação """
     rpa = HugMe()
+    rpa.start_driver()
+    rpa.access_website()
     rpa.login()
     if not rpa.logged:
         rpa.driver.quit()
@@ -16,7 +19,7 @@ def extract_reports_from_portal():
     rpa.access_reports_page()
     rpa.select_preset_filter()
 
-    # Gerar relatórios para todas as empresas
+    """ Gerar relatórios para todas as empresas """
     for empresa, selection_name in rpa.empresas.items():
         rpa.select_empresa(empresa=selection_name)
         titulo = empresa.replace(' ', '_') + '_' + str(time()).replace('.', '')
@@ -26,7 +29,7 @@ def extract_reports_from_portal():
     to_be_downloaded = list(rpa.new_reports.values())
     print('\nVerificando disponibilidade de download...\n')
 
-    # Verificar se o relatório foi gerado e fazer o download
+    """ Verificar se o relatório foi gerado e fazer o download """
     while not to_be_downloaded == []:
         rpa.driver.refresh()
         rpa.scrolldown_load_older_reports(times=2)
@@ -50,16 +53,15 @@ def extract_reports_from_portal():
     rpa.driver.quit()
     sleep(3)
 
-    # Concatenar os arquivos baixados e gerar a base consolidada
+    """ Concatenar os arquivos baixados e gerar a base consolidada """
     rpa.get_downloaded_files_names()
     # rpa.move_all_downloaded_files()
     rpa.concatenate_files()
     rpa.delete_all_downloaded_files()
     rpa.move_to_storage_account()
 
-    print('\nExtração concluída.\n')
-
-    print('Tempo de execução: ', datetime.now().replace(microsecond=0) - temp_ini)
+    print('\nExtração concluída.')
+    print('\nTempo de execução: ', datetime.now().replace(microsecond=0) - temp_ini)
 
 
 def schedule_run():

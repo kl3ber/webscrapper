@@ -8,7 +8,7 @@ from time import sleep
 
 
 class HugMe(object):
-    def __init__(self, hide=False, open_browser=True):
+    def __init__(self, headless=True):
         self.logged = False
         self.filter_name = filter_name
         self.empresas = empresas
@@ -18,34 +18,40 @@ class HugMe(object):
         self.final_file = None
 
         self.driver = None
-        self.hide = hide
+        self.headless = headless
 
-        if open_browser:
-            self.access_website()
-
-    def access_website(self):
+    def start_driver(self):
         from selenium.webdriver.chrome.options import Options
 
         options = Options()
-        options.headless = self.hide
-        options.add_argument("--mute-audio")
+        options.headless = self.headless
         # options.add_argument("--incognito")
-        # options.add_argument("download.default_directory=" + self.destination_folder)
-        # options.add_argument("download.default_directory=C:/Users/est_ab1283160/Documents/projects/gpa_webscrapper/hugme/data")
-        options.add_experimental_option('prefs', {'download.default_directory': self.destination_folder})
+        options.add_argument("--mute-audio")
+        options.add_argument("--disable-notifications")
+        options.add_argument('--no-sandbox')
+        options.add_argument('--verbose')
+        options.add_argument("--log-level=3")
+        options.add_experimental_option('prefs', {
+            'download.default_directory': self.destination_folder,
+            'download.prompt_for_download': False,
+            'download.directory_upgrade': True,
+            'safebrowsing_for_trusted_sources_enabled': False,
+            'safebrowsing.disable_download_protection': True,
+            'safebrowsing.enabled': False,
+        })
 
         driver = webdriver.Chrome(ChromeDriverManager().install(), options=options)
-        driver.maximize_window()
-        driver.implicitly_wait(300)
-        driver.get('https://app.hugme.com.br/')
 
-        # try:
-        #    driver.set_page_load_timeout(10)
-        #    driver.get('https://app.hugme.com.br/')
-        # except Exception:
-        #    # driver.execute_script("window.stop();")
+        driver.command_executor._commands["send_command"] = ("POST", '/session/$sessionId/chromium/send_command')
+        params = {'cmd': 'Page.setDownloadBehavior', 'params': {'behavior': 'allow', 'downloadPath': self.destination_folder}}
+        driver.execute("send_command", params)
 
         self.driver = driver
+
+    def access_website(self):
+        # self.driver.maximize_window()
+        self.driver.implicitly_wait(300)
+        self.driver.get('https://app.hugme.com.br/')
 
     def login(self, retries=15):
         from hugme.__key__ import uid, pwd
@@ -159,13 +165,13 @@ class HugMe(object):
                 return n + 1, download
 
     def download_report(self, index):
-        """ Downlaod do relatóio """
+        """ Downlaod do relatório """
         self.driver.find_element_by_xpath(xpath['Download'].format(index)).click()
         sleep(5)
 
     def check_file_download(self, report_name):
-        from os import listdir, path
-        # path.expanduser('~/Downloads/')
+        from os import listdir
+
         for file in listdir(self.destination_folder):
             if report_name.replace('_', '').lower() in file:
                 return True
@@ -190,8 +196,8 @@ class HugMe(object):
         return getcwd() + '\\data\\' if getcwd().split('\\')[-1] == name else getcwd() + '\\' + name + '\\data\\'
 
     def get_downloaded_files_names(self):
-        from os import listdir, path
-        # path.expanduser('~\\Downloads\\
+        from os import listdir
+
         result = {
             empresa: file
             for empresa, report in self.new_reports.items()
@@ -200,7 +206,10 @@ class HugMe(object):
         }
 
         self.downloaded_files = result
-        # return result
+
+    def get_data_folder_files(self):
+        from os import listdir
+        return listdir(self.destination_folder)
 
     def move_downloaded_file(self, report_name):
         """ Mover apenas arquivo para a pasta data do projeto """
@@ -227,6 +236,8 @@ class HugMe(object):
         from pandas import read_excel, DataFrame
         from datetime import datetime
 
+        print('\n' + datetime.now().strftime("%Y-%m-%d %H:%M:%S"), 'Concatenando os arquivos ...')
+
         base_reclamacoes = DataFrame()
         for empresa, file in self.downloaded_files.items():
             df = read_excel(self.destination_folder + file, header=3)
@@ -249,6 +260,9 @@ class HugMe(object):
 
     def move_to_storage_account(self, object='blob'):
         from hugme.__key__ import acc, key
+        from datetime import datetime
+
+        print(datetime.now().strftime("%Y-%m-%d %H:%M:%S"), 'Movendo arquivo final para o {} storage...'.format(object))
 
         if object == 'blob':
             from azure.storage.blob import BlockBlobService, PublicAccess
@@ -256,8 +270,8 @@ class HugMe(object):
             block_blob_service = BlockBlobService(account_name=acc, account_key=key)
             block_blob_service.set_container_acl('final', public_access=PublicAccess.Container)
             block_blob_service.create_blob_from_path(
-                container_name='final',
-                blob_name='hugme',
+                container_name='hugme',
+                blob_name='base',
                 file_path=self.final_file,
             )
 
@@ -265,12 +279,10 @@ class HugMe(object):
             from azure.storage.file import FileService
 
             file_service = FileService(account_name=acc, account_key=key)
-            # file_service.create_share('complains')
-            # file_service.create_directory('complains', 'final')
             file_service.create_file_from_path(
                 share_name='complains',
-                directory_name='final',
-                file_name='hugme.csv',
+                directory_name='hugme',
+                file_name='base.csv',
                 local_file_path=self.final_file,
             )
 

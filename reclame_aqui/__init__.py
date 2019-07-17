@@ -4,7 +4,7 @@ from datetime import datetime
 from time import sleep
 from pandas import set_option, DataFrame
 
-set_option('display.max_rows', 15)
+set_option('display.max_rows', 30)
 set_option('display.max_columns', 100)
 set_option('display.width', 10000)
 
@@ -16,8 +16,9 @@ print(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
 
 result = []
 retry = []
-for n in range(45750, 95001, 50):
-    requisicao = requests.get(url.format(n))
+for n in range(0, 95001, 50):
+    session = requests.Session()
+    requisicao = session.get(url.format(n), headers=header)
     status = requisicao.status_code
     if status == 200:
         requisicao = requisicao.json()['complainResult']['complains']['data']
