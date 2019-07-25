@@ -1,6 +1,7 @@
 
-from hugme.config import xpath, empresas, filter_name, chrome_version
+from hugme.config import xpath, chrome_version
 
+from importlib import import_module
 from selenium import webdriver
 from webdriver_manager.chrome import ChromeDriverManager
 from bs4 import BeautifulSoup
@@ -8,37 +9,49 @@ from time import sleep
 
 
 class HugMe(object):
-    def __init__(self, headless=True):
+    def __init__(self, operacao, headless=True):
+        self.operacao = operacao.lower().strip().replace(' ', '_')
+        self.filter_name = getattr(import_module(f'hugme.{self.operacao}'), 'FILTER_NAME')
+        self.empresas = getattr(import_module(f'hugme.{self.operacao}'), 'EMPRESAS')
+
+        self.driver = None
+        self.headless = headless
         self.logged = False
-        self.filter_name = filter_name
-        self.empresas = empresas
+
         self.destination_folder = self.check_destination_folder()
         self.new_reports = {}
         self.downloaded_files = {}
         self.final_file = None
 
-        self.driver = None
-        self.headless = headless
+    def __enter__(self):
+        self.start_driver()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if self.driver is not None:
+            self.driver.close()
+            self.driver.quit()
+            sleep(2)
 
     def start_driver(self):
         from selenium.webdriver.chrome.options import Options
 
         options = Options()
         options.headless = self.headless
-        # options.add_argument("--incognito")
-        options.add_argument("--mute-audio")
-        options.add_argument("--disable-notifications")
-        options.add_argument('--no-sandbox')
-        options.add_argument('--verbose')
         options.add_argument("--log-level=3")
-        options.add_experimental_option('prefs', {
-            'download.default_directory': self.destination_folder,
-            'download.prompt_for_download': False,
-            'download.directory_upgrade': True,
-            'safebrowsing_for_trusted_sources_enabled': False,
-            'safebrowsing.disable_download_protection': True,
-            'safebrowsing.enabled': False,
-        })
+        # # options.add_argument("--incognito")
+        # options.add_argument("--mute-audio")
+        # options.add_argument("--disable-notifications")
+        # options.add_argument('--no-sandbox')
+        # options.add_argument('--verbose')
+        # options.add_experimental_option('prefs', {
+        #     'download.default_directory': self.destination_folder,
+        #     'download.prompt_for_download': False,
+        #     'download.directory_upgrade': True,
+        #     'safebrowsing_for_trusted_sources_enabled': False,
+        #     'safebrowsing.disable_download_protection': True,
+        #     'safebrowsing.enabled': False,
+        # })
 
         driver = webdriver.Chrome(ChromeDriverManager().install(), options=options)
 
@@ -54,8 +67,12 @@ class HugMe(object):
         self.driver.get('https://app.hugme.com.br/')
 
     def login(self, retries=15):
-        from hugme.__key__ import uid, pwd
         from datetime import datetime
+
+        uid, pwd = tuple(getattr(import_module(f'hugme.__key__'), self.operacao.upper()).values())
+
+        self.driver.find_element_by_id('user').clear()
+        self.driver.find_element_by_id('password').clear()
 
         self.driver.find_element_by_id('user').send_keys(uid)
         self.driver.find_element_by_id('password').send_keys(pwd)
@@ -170,10 +187,11 @@ class HugMe(object):
         sleep(5)
 
     def check_file_download(self, report_name):
+        """ Verifica se o download do arquivo já terminou """
         from os import listdir
 
         for file in listdir(self.destination_folder):
-            if report_name.replace('_', '').lower() in file:
+            if report_name.replace('_', '').replace(' ', '-').lower() in file:
                 return True
         return False
 
@@ -206,10 +224,6 @@ class HugMe(object):
         }
 
         self.downloaded_files = result
-
-    def get_data_folder_files(self):
-        from os import listdir
-        return listdir(self.destination_folder)
 
     def move_downloaded_file(self, report_name):
         """ Mover apenas arquivo para a pasta data do projeto """
@@ -248,7 +262,8 @@ class HugMe(object):
             if 'Unnamed' in col:
                 base_reclamacoes.drop(columns=col, inplace=True)
 
-        self.final_file = self.destination_folder + datetime.now().strftime('%Y%m%d%H%M%S') + '_base_reclamacoes.csv'
+        file = datetime.now().strftime('%Y%m%d%H%M%S') + '_' + self.operacao + '.csv'
+        self.final_file = self.destination_folder + file
         base_reclamacoes.to_csv(self.final_file, index=False)
 
     def delete_all_downloaded_files(self):
@@ -258,33 +273,21 @@ class HugMe(object):
         for file in list(self.downloaded_files.values()):
             remove(self.destination_folder + file)
 
-    def move_to_storage_account(self, object='blob'):
-        from hugme.__key__ import acc, key
+    def move_to_blob(self):
+        from azure.storage.blob import BlockBlobService, PublicAccess
         from datetime import datetime
 
-        print(datetime.now().strftime("%Y-%m-%d %H:%M:%S"), 'Movendo arquivo final para o {} storage...'.format(object))
+        print(datetime.now().strftime("%Y-%m-%d %H:%M:%S"), 'Movendo arquivo final para o blob storage...')
 
-        if object == 'blob':
-            from azure.storage.blob import BlockBlobService, PublicAccess
+        acc, key = tuple(getattr(import_module(f'hugme.__key__'), 'STORAGE_ACCOUNT').values())
 
-            block_blob_service = BlockBlobService(account_name=acc, account_key=key)
-            block_blob_service.set_container_acl('final', public_access=PublicAccess.Container)
-            block_blob_service.create_blob_from_path(
-                container_name='hugme',
-                blob_name='base',
-                file_path=self.final_file,
-            )
-
-        elif object == 'files':
-            from azure.storage.file import FileService
-
-            file_service = FileService(account_name=acc, account_key=key)
-            file_service.create_file_from_path(
-                share_name='complains',
-                directory_name='hugme',
-                file_name='base.csv',
-                local_file_path=self.final_file,
-            )
+        block_blob_service = BlockBlobService(account_name=acc, account_key=key)
+        block_blob_service.set_container_acl('hugme', public_access=PublicAccess.Container)
+        block_blob_service.create_blob_from_path(
+            container_name='hugme',
+            blob_name=self.operacao,
+            file_path=self.final_file,
+        )
 
 
 if __name__ == '__main__':

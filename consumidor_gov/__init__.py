@@ -9,8 +9,8 @@ class Comparativo(object):
     def __init__(self):
         self.header = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/61.0.3163.100 Safari/537.36'}
 
-        self.home = 'https://www.consumidor.gov.br/pages/indicador/ranking/'
-        self.position = 'listar.json?sEcho=3&iColumns=3&sColumns=&iDisplayStart=0&iDisplayLength=100&mDataProp_0=posicao&mDataProp_1'
+        self.home = 'https://www.consumidor.gov.br/pages/indicador/ranking/listar.json?'
+        self.position = 'sEcho=3&iColumns=3&sColumns=&iDisplayStart=0&iDisplayLength=100&mDataProp_0=posicao&mDataProp_1'
         self.parameter = '=nomeFantasiaOuRazaoSocial&mDataProp_2=valor&segmento={}&periodo={}'
 
         self.segmentos = {8: 'Varejo', 9: 'Comércio Eletrônico', }
@@ -163,13 +163,19 @@ class EmpresasDoGrupo(object):
         self.driver.get('https://www.consumidor.gov.br/pages/exportacao-dados/novo')
         self.driver.implicitly_wait(10)
 
-    def calculate_date_period(self):
-        from
+    def calculate_period(self):
+        from datetime import date
+        from dateutil.relativedelta import relativedelta
 
-    def set_filters(self):
-        self.driver.find_element_by_xpath('//*[@id="dataIniPeriodo"]').send_keys('21052019')
+        date_end = date.today() - relativedelta(days=1)
+        date_ini = date_end - relativedelta(months=2)
+
+        return date_ini, date_end
+
+    def set_filters(self, start_date, finish_date):
+        self.driver.find_element_by_xpath('//*[@id="dataIniPeriodo"]').send_keys(start_date)
         sleep(1)
-        self.driver.find_element_by_xpath('//*[@id="dataFimPeriodo"]').send_keys('21072019')
+        self.driver.find_element_by_xpath('//*[@id="dataFimPeriodo"]').send_keys(finish_date)
         sleep(1)
         self.driver.find_element_by_xpath('//*[@id="colunasExportadas1"]').click()
         sleep(1)
@@ -180,6 +186,7 @@ class EmpresasDoGrupo(object):
         html = driver.find_element_by_xpath('//*[@id="menu_sel_fornecedor"]').get_attribute('innerHTML')
         soup = BeautifulSoup(html, 'html.parser')
         return {option.text: option['value'] for option in soup.find_all('option') if option['value'] != 'Selecione'}
+
 
 if __name__ == '__main__':
     rpa = Comparativo()

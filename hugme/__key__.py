@@ -1,9 +1,12 @@
 
-# hugme
-uid = 'fabricio.sbravatti@atento.com'
-pwd = 'Atento2019'
+# hugme web portal
+VIA_VAREJO =    {'uid': 'fabricio.sbravatti@atento.com',    'pwd': 'Atento2019'}
+PAO_DE_ACUCAR = {'uid': 'caroline.jose@atento.com',         'pwd': 'atento2019'}
+FIRST_DATA =    {'uid': '',                                 'pwd': ''}
 
-# account storage
-acc = 'gparpa'
-key = 'GLuoryujV2pZ2QWbX5lZ/e1xS6Lt+R69ZbNrM7QG2ppwVyWui/HAcQd1H70z+8H0VDBY0ve726gURYvRK4VRIQ=='
+# storage account
+STORAGE_ACCOUNT = {
+    'acc': 'webextractions',
+    'key': 'D6d1gF8E2j4SUYXvDGjB8tcngnX9j/1eC0pyU4Elxynd9j7QUt27VHSMWMyFq69GBX4Id8jlOqINAjdE77JJPw=='
+}
 
