@@ -1,5 +1,4 @@
 
-chrome_version = '75.0.3770.100'
 
 xpath = {
     'Empresa':              '/html/body/div[3]/div/div/div/div[1]/div/div[1]/div[1]/div[1]/select',

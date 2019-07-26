@@ -13,3 +13,4 @@ EMPRESAS = {
     'CASAS BAHIA LOJA FISICA':  'Casas Bahia - Lojas Físicas',
     'PONTO FRIO LOJA FISICA':   'Ponto Frio - Lojas Físicas',
 }
+

@@ -1,5 +1,5 @@
 
-from hugme.config import xpath, chrome_version
+from hugme.config import xpath
 
 from importlib import import_module
 from selenium import webdriver
@@ -91,7 +91,7 @@ class HugMe(object):
                 print(datetime.now().strftime("%Y-%m-%d %H:%M:%S"), error)
                 sleep(10)
 
-        return print('Não foi possível logar no sistema.')
+        return print(self.operacao + ': ', 'Não foi possível logar no sistema.')
 
     def access_reports_page(self):
         self.driver.get('https://app.hugme.com.br/app.html#/dados/tickets/exportar/')
@@ -138,24 +138,6 @@ class HugMe(object):
         print(datetime.now().strftime("%Y-%m-%d %H:%M:%S"), 'Relatório Gerado: ', report_name)
         sleep(5)
 
-    def scrolldown_load_older_reports(self, times=1):
-        """ Scroll down na lista de relatórios disponíveis, carregar mais relatórios """
-        while 'Carregar mais' not in self.driver.page_source: pass
-        sleep(3)
-        for i in range(times):
-            element = self.driver.find_element_by_xpath(xpath['Carregar Mais'])
-            self.driver.execute_script("arguments[0].scrollIntoView();", element)
-            self.driver.find_element_by_xpath(xpath['Carregar Mais']).click()
-            sleep(3)
-
-    def load_more_reports(self, times=1):
-        for i in range(times):
-            html = self.driver.find_element_by_xpath(xpath['Lista de Relatórios']).get_attribute('innerHTML')
-            while 'Carregar mais' not in html: pass
-            sleep(2)
-            self.driver.find_element_by_xpath(xpath['Carregar Mais']).click()
-            sleep(3)
-
     def get_all_reports(self):
         """ Retorna todos os relatórios listados """
         html = self.driver.find_element_by_xpath(xpath['Lista de Relatórios']).get_attribute('innerHTML')
@@ -180,6 +162,25 @@ class HugMe(object):
                 # minutes_left = int(reports[n].find_all('span')[4].text.split(' ')[1])
                 download = len(reports[n].find_all('button', class_='')) == 1
                 return n + 1, download
+
+    def scrolldown_load_older_reports(self, times=1):
+        """ Scroll down na lista de relatórios disponíveis, carregar mais relatórios """
+        if len(self.get_all_reports()) <= 21: return
+        while 'Carregar mais' not in self.driver.page_source: pass
+        sleep(3)
+        for i in range(times):
+            element = self.driver.find_element_by_xpath(xpath['Carregar Mais'])
+            self.driver.execute_script("arguments[0].scrollIntoView();", element)
+            self.driver.find_element_by_xpath(xpath['Carregar Mais']).click()
+            sleep(3)
+
+    def load_more_reports(self, times=1):
+        for i in range(times):
+            html = self.driver.find_element_by_xpath(xpath['Lista de Relatórios']).get_attribute('innerHTML')
+            while 'Carregar mais' not in html: pass
+            sleep(2)
+            self.driver.find_element_by_xpath(xpath['Carregar Mais']).click()
+            sleep(3)
 
     def download_report(self, index):
         """ Downlaod do relatório """

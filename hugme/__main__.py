@@ -13,7 +13,6 @@ def main(operacao):
         rpa.access_website()
         rpa.login()
         if not rpa.logged:
-            rpa.driver.quit()
             return
 
         rpa.access_reports_page()
@@ -65,7 +64,9 @@ def schedule_run():
     schedule.every().day.at("14:00").do(main, operacao='via_varejo')
     schedule.every().day.at("18:00").do(main, operacao='via_varejo')
 
-    schedule.every().day.at("08:30").do(main, operacao='pao_de_acucar')
+    schedule.every().day.at("08:00").do(main, operacao='pao_de_acucar')
+
+    schedule.every().day.at("08:00").do(main, operacao='first_data')
 
     while True:
         schedule.run_pending()
@@ -74,4 +75,5 @@ def schedule_run():
 
 if __name__ == '__main__':
     schedule_run()
+
 

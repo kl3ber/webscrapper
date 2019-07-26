@@ -1,0 +1,6 @@
+
+FILTER_NAME = 'SQUAD FD'
+
+EMPRESAS = {
+    'FIRST DATA': 'Bin',
+}
