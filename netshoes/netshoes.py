@@ -39,7 +39,6 @@ url_categories_by_sex = {
 sufix = '&psn=Menu_Top&nsCat=Artificial&page={}'
 
 data = []
-
 for key, value in url_categories_by_sex.items():
     if key != 'Infantil':
         gender = key
@@ -55,7 +54,6 @@ for key, value in url_categories_by_sex.items():
                 if soup.find('h2').text == 'Não foi possível encontrar resultados para o termo procurado':
                     break
 
-                # category = soup.find('h1').text
                 soup = soup.find('div', {'id': 'item-list'}).find('div', {'class': 'wrapper'})
                 soup = soup.find_all('div', {'class': 'item card-desktop card-with-rating lazy-price item-desktop--3'})
 
@@ -69,11 +67,59 @@ for key, value in url_categories_by_sex.items():
                         'data_position': n,
                         'parent_sku': product['parent-sku'],
                         'title': product.find('a', {'class': 'i card-link'})['title'],
-                        'href': product.find('a', {'class': 'i card-link'})['href'],
+                        'href': 'https://' + product.find('a', {'class': 'i card-link'})['href'],
                     }
                     data.append(info)
 
 df = DataFrame(data, columns=data[0].keys())
 
-df
+
+def get_infos(url):
+    import re
+
+    try:
+        r = requests.get(url)
+        soup = BeautifulSoup(r.text, 'html.parser')
+        buybox = soup.find(id='buy-box')
+
+        price = float(buybox.find(itemprop='price')['content'])
+        original_price = float(buybox.find('del').text[3:].replace(',', '.')) if buybox.find('del') is not None else price
+        savings = - float(re.search('\(([^)]+)', buybox.find(class_='default-price saving mult-seller').text).group(1).replace('%','')) / 100 if price != original_price else 0
+
+        if soup.find('section', class_='badges-item').text == '':
+            realease = False
+            reviews = int(soup.find('a', {'href': '#reviews'}).text.split(' ')[0])
+            recommend = int(soup.find('div', class_='line-average').text.replace('%', '')) / 100
+            rating = float(soup.find('span', {'itemprop': 'ratingValue'}).text)
+        else:
+            realease = True
+            reviews = 0
+            recommend = 0
+            rating = None
+
+        return {
+            'available': buybox.find(class_='if-available hide') is None,
+            'price': price,
+            'original_price': original_price,
+            'savings': savings,
+            'installment': buybox.find(class_='installments-price').text.split(' ')[0].replace('x', ''),
+            'product_seller': buybox.find(class_='product-seller').text[22:].strip(),
+            'color': soup.find('span', class_='sku-select-title').text,
+            'sizes': ','.join([item.find('a').text for item in soup.find('ul', {'data-type': 'size'}).find_all('li')]),
+            'new_realease': realease,
+            'reviews': reviews,
+            'recommend': recommend,
+            'rating': rating,
+        }
+
+    except:
+        return 'error'
+
+
+inside_data = df['href'].apply(get_infos)
+
+df.sample(5)
+
+def get_product_by_internal_api():
+    url = 'https://www.netshoes.com.br/frdmprcs/U51-0247-016'
 
